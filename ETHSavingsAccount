@@ -1,1 +1,28 @@
+// ETH savings Account, guided practice via Dapp University Youtube Channel
+// Heres a link to the video: https://youtu.be/w3lemj9KkhE
+// The only change I made was "payable" in place of "address" on line 25, (fixed compiler error);
+
+pragma solidity^0.8.7;
+//SPDX-License-Identifier: MIT
+
+contract TimeLock {
+    address payable beneficiary;
+    uint256 releaseTime;
+
+    constructor(
+        address payable _beneficiary, 
+        uint256 _releaseTime
+    ) 
+        public
+        payable
+    {
+        require(_releaseTime> block.timestamp);
+        beneficiary= _beneficiary;
+        releaseTime= _releaseTime;
+    }
+    function release() public{
+        require(block.timestamp >= releaseTime);
+        payable(beneficiary).transfer(address(this).balance);
+    }
+}
 
