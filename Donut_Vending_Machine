@@ -1,0 +1,40 @@
+// This contract creates a donut vending machine that starts with a balance of 100 donuts which cost 2 eth each. 
+//This was a guided practice via block explorer Youtube Channel. Video Link: https://youtu.be/wWAkR7CUwe4
+// I personally added the withdraw funds and check assets functions (lines 33 and 37) for the owner to take profits.
+
+pragma solidity^0.8.7;
+//SPDX-License-Identifier: MIT
+
+contract vendingMachine {
+    address public owner;
+    mapping(address=> uint256) public donutBalances;
+
+    constructor() {
+        owner=msg.sender;
+        donutBalances[address(this)]=100;
+    }
+
+    function getVendingMachineBalance() public view returns(uint256){
+        return donutBalances[address(this)];
+    }
+
+    function restock(uint amount) public {
+        require(msg.sender==owner, "Only the owner can restock the machine!");
+        donutBalances[address(this)] += amount;
+    }
+
+    function purchase(uint amount) public payable{
+        require(msg.value >= amount * 2 ether, "You must send 2 eth per donut!");
+        require(donutBalances[address(this)] >= amount, "Not enough donuts in stock!");
+        donutBalances[address(this)] -= amount;
+        donutBalances[msg.sender] += amount;
+    }
+
+    function withdrawFunds(uint amount) public{
+        payable (msg.sender).transfer(amount);
+        require(msg.sender==owner, "Only the owner can withdraw ETH from the machine!");
+    }
+    function checkAssets() public view returns (uint256){
+        return address(this).balance;
+    }
+}
