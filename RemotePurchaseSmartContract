@@ -1,0 +1,70 @@
+// Below is a safe remote purchase Ethereum smart contract. Guided by Block Explorer Youtube: https://youtu.be/jYBXD3FeOLI
+// This contract requires the buyer and seller to deposit *2 eth of the item price as collateral.
+
+pragma solidity^0.8.7;
+//SPDX-License-Identifier: MIT
+
+contract purchaseAgreement {
+    uint public value;
+    address payable public seller;
+    address payable public buyer;
+
+    enum State {created, locked, release, inactive}
+    State public state;
+
+    constructor() payable {
+        seller = payable (msg.sender);
+        value= msg.value /2;
+    }
+
+    /// The function cannot be called at the current state.
+    error InvalidState();
+    /// Only the buyer can call this function.
+    error OnlyBuyer();
+    /// Only the seller can call this function.
+    error OnlySeller();
+
+    modifier inState(State _state){
+        if (state != _state){
+            revert InvalidState();
+        }
+        _;
+    }
+
+    modifier onlyBuyer(){
+        if (msg.sender != buyer){
+            revert OnlyBuyer();
+        }
+        _;
+    }
+
+     modifier onlySeller(){
+        if (msg.sender != seller){
+            revert OnlySeller();
+        }
+        _;
+    }
+
+    function confirmPurchase() external inState(State.created) payable{
+        require(msg.value == (2* value), "Please send in 2x purchase amount.");
+        buyer= payable (msg.sender);
+        state= State.locked;
+    }
+
+    function confirmRecieved() external onlyBuyer inState(State.locked) {
+        state = State.release;
+        buyer.transfer(value);
+    }
+
+    function paySeller() external onlySeller inState(State.release){
+        state = State.inactive;
+        seller.transfer(3* value);
+    }
+
+    function abort() external onlySeller inState(State.created){
+        state = State.inactive;
+        seller.transfer(address(this).balance);
+    }
+
+
+}
