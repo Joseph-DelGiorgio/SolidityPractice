@@ -1,0 +1,207 @@
+// This code was created from watching the "Crowd Fund" youtube video by "Smart Contract Programmer". 
+//Video link: https://youtu.be/P-4ucHdjGpU
+
+// To start, You will need these three different sets of code to deploy crowdfunding contract properly.
+// #1. the IERC20 interface will be required first (I labled it #1) .
+// #2. Next is the ERC20 token contract, which allows you to mint tokens for the crowd funding, imports #1 code. (labled as #2).
+// #3. This is the crowdfunding contract, which require #1 and #2 to be present files in remix prior to deployment (labled as #3).
+
+// #1
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.10;
+
+interface IERC20 {
+    function totalSupply() external view returns (uint);
+
+    function balanceOf(address account) external view returns (uint);
+
+    function transfer(address recipient, uint amount) external returns (bool);
+
+    function allowance(address owner, address spender) external view returns (uint);
+
+    function approve(address spender, uint amount) external returns (bool);
+
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint amount
+    ) external returns (bool);
+
+    event Transfer(address indexed from, address indexed to, uint value);
+    event Approval(address indexed owner, address indexed spender, uint value);
+}
+
+
+
+// #2
+
+pragma solidity ^0.8.10;
+// SPDX-License-Identifier: MIT
+
+import "./IERC20.sol";
+
+contract ERC20 is IERC20 {
+    uint public totalSupply;
+    mapping(address => uint) public balanceOf;
+    mapping(address => mapping(address => uint)) public allowance;
+    string public name = "Solidity by Example";
+    string public symbol = "SOLBYEX";
+    uint8 public decimals = 18;
+
+    function transfer(address recipient, uint amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[recipient] += amount;
+        emit Transfer(msg.sender, recipient, amount);
+        return true;
+    }
+
+    function approve(address spender, uint amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint amount
+    ) external returns (bool) {
+        allowance[sender][msg.sender] -= amount;
+        balanceOf[sender] -= amount;
+        balanceOf[recipient] += amount;
+        emit Transfer(sender, recipient, amount);
+        return true;
+    }
+
+    function mint(uint amount) external {
+        balanceOf[msg.sender] += amount;
+        totalSupply += amount;
+        emit Transfer(address(0), msg.sender, amount);
+    }
+
+    function burn(uint amount) external {
+        balanceOf[msg.sender] -= amount;
+        totalSupply -= amount;
+        emit Transfer(msg.sender, address(0), amount);
+    }
+}
+
+
+//#3
+
+pragma solidity^0.8.10;
+//SPDX-License-Identifier: MIT
+
+import "./IERC20.sol";
+
+contract crowdFund{
+    event Launch(
+        uint id,
+        address indexed creator,
+        uint goal,
+        uint32 startAt,
+        uint32 endAt
+    );
+    event Cancel(uint id);
+    event Pledge(uint indexed id, address indexed caller, uint amount);
+    event Unpledge(uint indexed id, address indexed caller, uint amount);
+    event Claim(uint id);
+    event Refund(uint indexed id, address indexed caller, uint amount);
+
+
+    struct Campaign{
+        address creator;
+        uint goal;
+        uint pledged;
+        uint32 startAt;
+        uint32 endAt;
+        bool claimed;
+    }
+
+    IERC20 public immutable token;
+    uint public count;
+    mapping(uint=>Campaign) public campaigns;
+    mapping(uint=>mapping(address=>uint)) public pledgedAmount;
+
+    constructor(address _token){
+        token=IERC20(_token);
+    }
+
+    function launch(
+        uint _goal,
+        uint32 _startAt,
+        uint32 _endAt
+    ) public {
+        require(_startAt >= block.timestamp, "start at < now");
+        require(_endAt>= _startAt, "end at is < start at");
+        require(_endAt <= block.timestamp +90 days, "end at > max duration");
+
+        count += 1;
+        campaigns[count]= Campaign({
+            creator: msg.sender,
+            goal: _goal,
+            pledged: 0,
+            startAt: _startAt,
+            endAt: _endAt,
+            claimed: false
+        });
+        emit Launch(count, msg.sender, _goal, _startAt, _endAt);
+    }
+
+    function cancel (uint _id) external{
+        Campaign memory campaign = campaigns[_id];
+        require(msg.sender== campaign.creator, "not the creator");
+        require(block.timestamp < campaign.startAt, "started");
+        delete campaigns[_id];
+        emit Cancel (_id);
+
+    }
+
+    function pledge(uint _id, uint _amount)external{
+        Campaign storage campaign=campaigns[_id];
+        require(block.timestamp >= campaign.startAt, "not started");
+        require(block.timestamp <= campaign.endAt, "ended");
+
+        campaign.pledged += _amount;
+        pledgedAmount[_id][msg.sender] += _amount;
+        token.transferFrom(msg.sender, address(this), _amount);
+
+        emit Pledge(_id, msg.sender, _amount);
+    }
+
+    function unpledge(uint _id, uint _amount) external{
+        Campaign storage campaign = campaigns[_id];
+        require(block.timestamp <= campaign.endAt, "ended");
+
+        campaign.pledged -= _amount;
+        pledgedAmount[_id][msg.sender] -= _amount;
+        token.transfer(msg.sender, _amount);
+
+        emit Unpledge(_id, msg.sender, _amount); 
+    }
+
+    function claim(uint _id) external{
+        Campaign storage campaign = campaigns [_id];
+        require(msg.sender== campaign.creator, "not creator");
+        require(block.timestamp > campaign.endAt, "not ended");
+        require(campaign.pledged >= campaign.goal, "pledged < goal");
+        require(!campaign.claimed, "claimed");
+
+        campaign.claimed=true;
+        token.transfer(msg.sender, campaign.pledged);
+        
+        emit Claim(_id);
+    }
+
+    function refund(uint _id) external{
+        Campaign storage campaign = campaigns [_id];
+        require(block.timestamp > campaign.endAt, "not ended");
+        require(campaign.pledged >= campaign.goal, "pledged < goal");
+
+        uint bal = pledgedAmount[_id][msg.sender];
+        pledgedAmount[_id][msg.sender] =0;
+        token.transfer(msg.sender, bal);
+
+        emit Refund(_id, msg.sender, bal);
+    }
+}
