@@ -1,4 +1,4 @@
-// This excersise simulated a reentrancy attack. I was guided via the Block Explorer Youtube Channel
+// This exercise simulated a reentrancy attack. I was guided via the Block Explorer Youtube Channel
 //For optimal simulation, you must deploy the bank contract 1st, then the attack contract with the bank contract address.
 //video link https://youtu.be/3sIwIYfeOD8
 
