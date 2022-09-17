@@ -1,5 +1,5 @@
 // This was a guided practice via Dapp University Youtube channel. Video link: https://youtu.be/vcd6AoTf6Wk
-// This practice allows the attacker to prevent the NFT contract from minting, even if the goal isnt yet reached.
+// This practice allows the attacker to prevent the NFT contract from minting, even if the goal isnt yet reached, making the NFT contract futile.
 // This is done using selfdestruct.
 
 pragma solidity ^0.8.7;
