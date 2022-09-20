@@ -1,4 +1,5 @@
-// This contract allows a seller to list and sell an item(NFT) to a buyer. Also pays the Marketplace owner a listing fee.
+// This contract allows a seller to list and sell an item (NFT) to a buyer using ETH. 
+// The contract also pays the Marketplace owner a listing fee from the seller. The fee is curently coded at 0.1 ETH
 // This was a guided pactice via Nader Dabit Youtube Channel. Video link: https://youtu.be/4Pm1Furz5HM
 
 pragma solidity ^0.8.7;
