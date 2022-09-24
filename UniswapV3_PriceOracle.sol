@@ -1,4 +1,4 @@
-Guided practice via Smart contract Programmar using hardhat. Video link: https://youtu.be/tGW8MoiNj54
+//Guided practice via Smart contract Programmer using hardhat. Video link: https://youtu.be/tGW8MoiNj54
 //requires API and API key to deploy
 
 //SPDX-License-Identifier: MIT
