@@ -1,4 +1,4 @@
-//You must deploy the contract onto your desired ETH network via Hardhat. 
+//You must deploy the contract onto your desired ETH network via Hardhat using and endpoint provider like Infura. 
 //Once contract is deployed, it can be interacted with using this code and the given contract address on Remix Ethereum.
 
 // SPDX-License-Identifier: MIT
