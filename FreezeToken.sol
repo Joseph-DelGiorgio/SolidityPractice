@@ -23,6 +23,6 @@ contract FreezeFrameToken is ERC20, Pausable, Ownable{
         address to,
         uint256 amount
     ) internal whenNotPaused override{
-        super._beforeTokenTransfer(from, to, amount)
+        super._beforeTokenTransfer(from, to, amount);
     }
 }
