@@ -1139,13 +1139,6 @@ abstract contract ERC721URIStorage is ERC721 {
     }
 }
 
-pragma solidity ^0.8.2;
-//SPDX-License-Identifier: MIT
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-
-
-
 contract SoulBound is ERC721URIStorage{
 
     address owner;
