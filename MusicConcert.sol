@@ -13,14 +13,14 @@ contract TicketSeller {
 
   // The contract has variables that store the concert location, time, and date
   string public concertLocation;
-  uint256 public concertTime;
+  string public concertTime;
   uint256 public concertDate;
 
   // The contract has a constructor that sets the ticket price, location, time, and date
   constructor() public {
     ticketPrice = 0.5 ether;
     concertLocation = "Madison Square Garden, New York City, NY";
-    concertTime = 7:30;
+    concertTime = "7:30";
     concertDate = 2022-12-13;
   }
 
@@ -35,3 +35,5 @@ contract TicketSeller {
     // Transfer the token to the user
     newTicket.safeTransferFrom(address(this), msg.sender, newTicket.tokenId());
   }
+
+}
