@@ -1,0 +1,77 @@
+pragma solidity ^0.8.0;
+
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v3.1.0/contracts/math/SafeMath.sol";
+
+
+contract Escrow {
+    using SafeMath for uint256;
+
+    address payable public buyer;
+    address payable public seller;
+    address payable public arbitrator;
+    uint256 public amount;
+    bool public locked;
+    bool public dispute;
+    bool public refunded;
+    mapping (address => bool) public votes;
+
+    event LogFundTransfer(address indexed sender, uint256 value);
+    event LogDispute();
+    event LogRefund();
+
+    constructor (address payable _buyer, address payable _seller, address payable _arbitrator) public {
+        buyer = _buyer;
+        seller = _seller;
+        arbitrator = _arbitrator;
+    }
+
+    function deposit() public payable {
+        require(msg.sender == buyer, "Only the buyer can deposit funds.");
+        require(!locked, "Funds have already been deposited.");
+        amount = msg.value;
+        emit LogFundTransfer(msg.sender, msg.value);
+        locked = true;
+    }
+
+    function release() public {
+        require(msg.sender == arbitrator, "Only the arbitrator can release funds.");
+        require(locked, "Funds have not been deposited yet.");
+        require(!dispute, "A dispute is ongoing.");
+        require(!refunded, "Funds have already been released or refunded.");
+        seller.transfer(amount);
+        locked = false;
+    }
+
+    function refund() public {
+        require(msg.sender == arbitrator, "Only the arbitrator can refund funds.");
+        require(locked, "Funds have not been deposited yet.");
+        require(dispute, "No dispute is ongoing.");
+        require(!refunded, "Funds have already been released or refunded.");
+        buyer.transfer(amount);
+        locked = false;
+        refunded = true;
+        emit LogRefund();
+    }
+
+    function dispute() public {
+        require(msg.sender == buyer || msg.sender == seller, "Only buyer or seller can raise dispute.");
+        require(locked, "Funds have not been deposited yet.");
+        require(!dispute, "Dispute has already been raised.");
+        dispute = true;
+        emit LogDispute();
+    }
+
+    function vote(bool decision) public {
+        require(dispute, "There is no ongoing dispute.");
+        require(msg.sender == buyer || msg.sender == seller, "Only buyer or seller can vote.");
+        require(!votes[msg.sender], "You have already voted.");
+        votes[msg.sender] = decision;
+        if(votes[buyer] == votes[seller]) {
+            if (votes[buyer]) {
+                refund();
+            } else {
+                release();
+            }
+        }
+    }
+}
