@@ -43,6 +43,26 @@ contract TokenSwap {
         _;
     }
 
+     modifier onlyAfterSwapWindow() {
+        require(block.timestamp >= swapEndTime, "Swap window is still open");
+        _;
+    }
+
+    function withdrawRemainingFunds() external onlyOwner onlyAfterSwapWindow {
+        uint256 contractBalance = address(this).balance;
+        require(contractBalance > 0, "No remaining funds");
+
+        payable(msg.sender).transfer(contractBalance);
+        emit RemainingFundsWithdrawn(contractBalance);
+    }
+
+    function updateSwapDuration(uint256 _newDuration) external onlyOwner {
+        require(_newDuration > 0, "Duration must be greater than 0");
+        swapDuration = _newDuration;
+        swapEndTime = swapStartTime + _newDuration;
+    }
+
+
     function setSwapRatio(uint256 _ratio) external onlyOwner {
         require(_ratio > 0, "Ratio must be greater than 0");
         token1ToToken2Ratio = _ratio;
