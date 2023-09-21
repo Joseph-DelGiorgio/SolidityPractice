@@ -10,6 +10,8 @@ contract TokenSwap {
     uint256 public token1ToToken2Ratio;  // Ratio of token1 to token2 (e.g., 1 ETH = 1000 DAI)
     uint256 public feePercentage;  // Fee percentage (0-100)
     uint256 public swapDuration;  // Duration in seconds for which swaps are allowed after start
+    uint256 public swapFee;  // Fee in percentage (0-100)
+
     bool public swapsPaused;  // Flag to pause swaps
 
     uint256 public swapStartTime;  // Time when swaps are allowed
@@ -17,6 +19,8 @@ contract TokenSwap {
     event Swap(address indexed sender, uint256 token1Amount, uint256 token2Amount);
     event SwapsPaused();
     event SwapsResumed();
+    event SwapFeeDeducted(address indexed user, uint256 amount);
+
 
     constructor(address _token1Address, address _token2Address, uint256 _ratio, uint256 _feePercentage, uint256 _swapDuration) {
         token1 = IERC20(_token1Address);
@@ -54,6 +58,11 @@ contract TokenSwap {
 
         payable(msg.sender).transfer(contractBalance);
         emit RemainingFundsWithdrawn(contractBalance);
+    }
+
+    function setSwapFee(uint256 _swapFee) external onlyOwner {
+        require(_swapFee <= 100, "Invalid fee percentage");
+        swapFee = _swapFee;
     }
 
     function updateSwapDuration(uint256 _newDuration) external onlyOwner {
@@ -102,10 +111,19 @@ contract TokenSwap {
 
         uint256 token2Amount = calculateToken2Amount(_token1Amount);
 
+        // Deduct the fee
+        uint256 feeAmount = (_token1Amount * swapFee) / 100;
         require(token1.transferFrom(msg.sender, address(this), _token1Amount), "Token1 transfer failed");
+        require(token1.transfer(owner, feeAmount), "Fee transfer failed");  // Transfer fee to the owner
         require(token2.transfer(msg.sender, token2Amount), "Token2 transfer failed");
 
         emit Swap(msg.sender, _token1Amount, token2Amount);
+        emit SwapFeeDeducted(msg.sender, feeAmount);
+    }
+
+     receive() external payable onlyDuringSwapWindow {
+        require(msg.value > 0, "Invalid Ether amount");
+        // Fallback to accept Ether during the swap window
     }
 
     function withdrawTokens(address _tokenAddress, uint256 _amount) external onlyOwner {
@@ -127,4 +145,5 @@ contract TokenSwap {
         require(_newToken2Address != address(0), "Invalid address");
         token2 = IERC20(_newToken2Address);
     }
+
 }
