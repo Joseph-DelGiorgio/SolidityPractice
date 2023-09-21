@@ -9,19 +9,28 @@ contract TokenSwap {
     address public owner;
     uint256 public token1ToToken2Ratio;  // Ratio of token1 to token2 (e.g., 1 ETH = 1000 DAI)
     uint256 public feePercentage;  // Fee percentage (0-100)
+    uint256 public swapDuration;  // Duration in seconds for which swaps are allowed after start
+
+    uint256 public swapStartTime;  // Time when swaps are allowed
 
     event Swap(address indexed sender, uint256 token1Amount, uint256 token2Amount);
 
-    constructor(address _token1Address, address _token2Address, uint256 _ratio, uint256 _feePercentage) {
+    constructor(address _token1Address, address _token2Address, uint256 _ratio, uint256 _feePercentage, uint256 _swapDuration) {
         token1 = IERC20(_token1Address);
         token2 = IERC20(_token2Address);
         owner = msg.sender;
         token1ToToken2Ratio = _ratio;
         feePercentage = _feePercentage;
+        swapDuration = _swapDuration;
     }
 
     modifier onlyOwner() {
         require(msg.sender == owner, "Only owner can call this function");
+        _;
+    }
+
+    modifier onlyDuringSwapWindow() {
+        require(block.timestamp >= swapStartTime && block.timestamp < swapStartTime + swapDuration, "Swap window closed");
         _;
     }
 
@@ -35,12 +44,21 @@ contract TokenSwap {
         feePercentage = _feePercentage;
     }
 
+    function setSwapDuration(uint256 _swapDuration) external onlyOwner {
+        require(_swapDuration > 0, "Swap duration must be greater than 0");
+        swapDuration = _swapDuration;
+    }
+
+    function startSwaps() external onlyOwner {
+        swapStartTime = block.timestamp;
+    }
+
     function calculateToken2Amount(uint256 _token1Amount) internal view returns (uint256) {
         uint256 fee = (_token1Amount * feePercentage) / 100;
         return ((_token1Amount - fee) * token1ToToken2Ratio) / 1e18;
     }
 
-    function swapTokens(uint256 _token1Amount) external {
+    function swapTokens(uint256 _token1Amount) external onlyDuringSwapWindow {
         require(_token1Amount > 0, "Amount must be greater than 0");
 
         uint256 token2Amount = calculateToken2Amount(_token1Amount);
