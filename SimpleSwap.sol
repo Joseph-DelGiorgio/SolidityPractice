@@ -10,10 +10,13 @@ contract TokenSwap {
     uint256 public token1ToToken2Ratio;  // Ratio of token1 to token2 (e.g., 1 ETH = 1000 DAI)
     uint256 public feePercentage;  // Fee percentage (0-100)
     uint256 public swapDuration;  // Duration in seconds for which swaps are allowed after start
+    bool public swapsPaused;  // Flag to pause swaps
 
     uint256 public swapStartTime;  // Time when swaps are allowed
 
     event Swap(address indexed sender, uint256 token1Amount, uint256 token2Amount);
+    event SwapsPaused();
+    event SwapsResumed();
 
     constructor(address _token1Address, address _token2Address, uint256 _ratio, uint256 _feePercentage, uint256 _swapDuration) {
         token1 = IERC20(_token1Address);
@@ -22,6 +25,7 @@ contract TokenSwap {
         token1ToToken2Ratio = _ratio;
         feePercentage = _feePercentage;
         swapDuration = _swapDuration;
+        swapsPaused = false;
     }
 
     modifier onlyOwner() {
@@ -31,6 +35,11 @@ contract TokenSwap {
 
     modifier onlyDuringSwapWindow() {
         require(block.timestamp >= swapStartTime && block.timestamp < swapStartTime + swapDuration, "Swap window closed");
+        _;
+    }
+
+    modifier swapsNotPaused() {
+        require(!swapsPaused, "Swaps are paused");
         _;
     }
 
@@ -53,12 +62,22 @@ contract TokenSwap {
         swapStartTime = block.timestamp;
     }
 
+    function pauseSwaps() external onlyOwner {
+        swapsPaused = true;
+        emit SwapsPaused();
+    }
+
+    function resumeSwaps() external onlyOwner {
+        swapsPaused = false;
+        emit SwapsResumed();
+    }
+
     function calculateToken2Amount(uint256 _token1Amount) internal view returns (uint256) {
         uint256 fee = (_token1Amount * feePercentage) / 100;
         return ((_token1Amount - fee) * token1ToToken2Ratio) / 1e18;
     }
 
-    function swapTokens(uint256 _token1Amount) external onlyDuringSwapWindow {
+    function swapTokens(uint256 _token1Amount) external onlyDuringSwapWindow swapsNotPaused {
         require(_token1Amount > 0, "Amount must be greater than 0");
 
         uint256 token2Amount = calculateToken2Amount(_token1Amount);
@@ -77,5 +96,15 @@ contract TokenSwap {
     function updateOwner(address _newOwner) external onlyOwner {
         require(_newOwner != address(0), "Invalid address");
         owner = _newOwner;
+    }
+
+    function changeToken1Address(address _newToken1Address) external onlyOwner {
+        require(_newToken1Address != address(0), "Invalid address");
+        token1 = IERC20(_newToken1Address);
+    }
+
+    function changeToken2Address(address _newToken2Address) external onlyOwner {
+        require(_newToken2Address != address(0), "Invalid address");
+        token2 = IERC20(_newToken2Address);
     }
 }
