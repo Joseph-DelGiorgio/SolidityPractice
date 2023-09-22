@@ -15,6 +15,7 @@ contract ContentLicense is ERC721Enumerable, Ownable {
     event ContentLicensed(uint256 indexed tokenId, address indexed licensee);
     event LicensePriceChanged(uint256 newPrice);
     event ContentUpdated(uint256 indexed tokenId, string newContentURI);
+    event LicenseRevoked(uint256 indexed tokenId);
 
     constructor(string memory name, string memory symbol, string memory baseTokenURI) ERC721(name, symbol) {
         _baseTokenURI = baseTokenURI;
@@ -59,9 +60,22 @@ contract ContentLicense is ERC721Enumerable, Ownable {
         return _tokenContent[tokenId];
     }
 
-    function updateContent(uint256 tokenId, string memory newContentURI) external onlyOwner {
+    function updateContent(uint256 tokenId, string memory newContentURI) external onlyContentOwner(tokenId) {
         require(tokenId > 0 && tokenId < _nextTokenId, "Invalid token ID");
         _tokenContent[tokenId] = newContentURI;
         emit ContentUpdated(tokenId, newContentURI);
+    }
+
+    function revokeLicense(uint256 tokenId) external onlyContentOwner(tokenId) {
+        require(tokenId > 0 && tokenId < _nextTokenId, "Invalid token ID");
+        require(_tokenLicensed[tokenId], "Token is not licensed");
+
+        _tokenLicensed[tokenId] = false;
+        emit LicenseRevoked(tokenId);
+    }
+
+    modifier onlyContentOwner(uint256 tokenId) {
+        require(ownerOf(tokenId) == msg.sender, "Not the content owner");
+        _;
     }
 }
