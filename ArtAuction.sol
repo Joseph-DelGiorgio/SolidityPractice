@@ -84,6 +84,11 @@ contract ArtMarketplace is ERC721Enumerable, Ownable {
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {}
 
+    
+    function _baseURI() internal view virtual override returns (string memory) {
+        return "https://put api.example here"; //put api link example here
+    }
+
     // Add other helper functions, events, etc.
 }
 
