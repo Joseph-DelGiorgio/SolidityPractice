@@ -7,109 +7,83 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract ArtMarketplace is ERC721Enumerable, Ownable {
     uint256 public nextTokenId;
-    uint256 public auctionDuration;  // Auction duration in seconds
+    uint256 public auctionDuration; // Auction duration in seconds
 
-    mapping(uint256 => uint256) public tokenPrice;  // Token ID to Price
-    mapping(uint256 => uint256) public tokenAuctionEnd;  // Token ID to Auction End Time
+    mapping(uint256 => uint256) public tokenAuctionEnd;
+    mapping(uint256 => address) public approvedAuctionBidder;
+    mapping(uint256 => uint256) public highestBid;
 
-    event ArtTokenListed(uint256 indexed tokenId, uint256 price);
-    event ArtTokenDelisted(uint256 indexed tokenId);
-    event ArtTokenPurchased(uint256 indexed tokenId, address buyer, uint256 price);
-    event ArtTokenAuctionStarted(uint256 indexed tokenId, uint256 endTime);
-    event ArtTokenAuctionEnded(uint256 indexed tokenId, address winner, uint256 price);
+    event ArtAuctionStarted(uint256 indexed tokenId, uint256 auctionEnd);
+    event ArtAuctionBidPlaced(uint256 indexed tokenId, address bidder, uint256 bidAmount);
 
     constructor() ERC721("ArtMarketplace", "ART") {
-        nextTokenId = 1;
-        auctionDuration = 7 days;  // Initial auction duration set to 7 days
+        auctionDuration = 1 days; // Default to 1 day for auctions
     }
 
-    function listArtForSale(uint256 tokenId, uint256 price) external {
-        require(_isApprovedOrOwner(_msgSender(), tokenId), "Not owner or approved");
-        require(price > 0, "Price must be greater than 0");
-
-        tokenPrice[tokenId] = price;
-        emit ArtTokenListed(tokenId, price);
+    function setAuctionDuration(uint256 _auctionDuration) external onlyOwner {
+        auctionDuration = _auctionDuration;
     }
 
-    function delistArt(uint256 tokenId) external {
-        require(_isApprovedOrOwner(_msgSender(), tokenId), "Not owner or approved");
+    function startAuction(uint256 tokenId) external onlyOwner {
+        require(ownerOf(tokenId) == msg.sender, "Not the owner");
+        require(tokenAuctionEnd[tokenId] == 0, "Auction already started");
 
-        tokenPrice[tokenId] = 0;
-        emit ArtTokenDelisted(tokenId);
+        uint256 auctionEnd = block.timestamp + auctionDuration;
+        tokenAuctionEnd[tokenId] = auctionEnd;
+
+        emit ArtAuctionStarted(tokenId, auctionEnd);
     }
 
-    function purchaseArt(uint256 tokenId) external payable {
-        uint256 price = tokenPrice[tokenId];
-        require(price > 0, "Art not for sale");
-        require(msg.value >= price, "Insufficient funds");
+    function placeBid(uint256 tokenId) external payable {
+        require(tokenAuctionEnd[tokenId] > 0, "Auction not started");
+        require(block.timestamp < tokenAuctionEnd[tokenId], "Auction ended");
+        require(msg.value > highestBid[tokenId], "Bid amount is too low");
 
-        address seller = ownerOf(tokenId);
+        address previousBidder = approvedAuctionBidder[tokenId];
+        if (previousBidder != address(0)) {
+            (bool returnSuccess, ) = previousBidder.call{value: highestBid[tokenId]}("");
+            require(returnSuccess, "Failed to return previous bid");
+        }
 
-        _transfer(seller, msg.sender, tokenId);
-        tokenPrice[tokenId] = 0;  // Remove listing
+        highestBid[tokenId] = msg.value;
+        approvedAuctionBidder[tokenId] = msg.sender;
 
-        (bool success, ) = seller.call{value: price}("");  // Send funds to the seller
-        require(success, "Payment to seller failed");
-
-        emit ArtTokenPurchased(tokenId, msg.sender, price);
+        emit ArtAuctionBidPlaced(tokenId, msg.sender, msg.value);
     }
 
-    function startAuction(uint256 tokenId) external {
-        require(_isApprovedOrOwner(_msgSender(), tokenId), "Not owner or approved");
-
-        uint256 endTime = block.timestamp + auctionDuration;
-        tokenAuctionEnd[tokenId] = endTime;
-
-        emit ArtTokenAuctionStarted(tokenId, endTime);
-    }
-
-    function endAuction(uint256 tokenId) external {
+    function getHighestBidder(uint256 tokenId) external view returns (address) {
         require(tokenAuctionEnd[tokenId] > 0, "Auction not started");
         require(block.timestamp >= tokenAuctionEnd[tokenId], "Auction not ended yet");
 
-        address winner = highestBidder(tokenId);
-        require(winner != address(0), "No bids");
+        return approvedAuctionBidder[tokenId];
+    }
 
-        uint256 price = msg.value;
+    function claimArt(uint256 tokenId) external {
+        require(ownerOf(tokenId) == msg.sender, "Not the owner");
+        require(tokenAuctionEnd[tokenId] > 0, "Auction not started");
+        require(block.timestamp >= tokenAuctionEnd[tokenId], "Auction not ended yet");
+        require(approvedAuctionBidder[tokenId] == msg.sender, "Not the highest bidder");
 
-        // Transfer the NFT to the winner
-        _transfer(ownerOf(tokenId), winner, tokenId);
-
-        // Transfer the bid amount to the seller
-        (bool success, ) = ownerOf(tokenId).call{value: price}("");
-        require(success, "Payment to seller failed");
+        _transfer(ownerOf(tokenId), msg.sender, tokenId);
 
         // Reset auction data
         tokenAuctionEnd[tokenId] = 0;
-
-        emit ArtTokenAuctionEnded(tokenId, winner, price);
+        highestBid[tokenId] = 0;
+        approvedAuctionBidder[tokenId] = address(0);
     }
 
-    function highestBidder(uint256 tokenId) public view returns (address) {
-        require(tokenAuctionEnd[tokenId] > 0, "Auction not started");
-        require(block.timestamp >= tokenAuctionEnd[tokenId], "Auction not ended yet");
-
-        uint256 highestBid = 0;
-        address highestBidderAddress;
-
-        // Find the highest bidder
-        for (uint256 i = 0; i < balanceOf(address(this)); i++) {
-            address bidder = ownerOf(tokenByIndex(tokenId));
-            uint256 bid = msg.value;
-
-            if (bid > highestBid) {
-                highestBid = bid;
-                highestBidderAddress = bidder;
-            }
-        }
-
-        return highestBidderAddress;
+    function mint() external {
+        require(nextTokenId < 10000, "Token limit exceeded");
+        _safeMint(msg.sender, nextTokenId);
+        nextTokenId++;
     }
 
-    // Override functions to handle auction end times
-    function _baseURI() internal view virtual override returns (string memory) {}
+    function _baseURI() internal view virtual override returns (string memory) {
+        return "https://api.example.com/metadata/";
+    }
+
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {}
 
-    // ... (other helper functions, events, etc.)
+    // Add other helper functions, events, etc.
 }
 
