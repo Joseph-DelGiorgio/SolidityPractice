@@ -78,9 +78,42 @@ contract ArtMarketplace is ERC721Enumerable, Ownable {
         nextTokenId++;
     }
 
-    function _baseURI() internal view virtual override returns (string memory) {
-        return "https://api.example.com/metadata/";
+       function pause() external onlyOwner {
+        _pause();
     }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function withdrawFunds() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No balance to withdraw");
+        payable(owner()).transfer(balance);
+    }
+
+
+    function emergencyWithdraw(uint256 tokenId) external onlyOwner {
+        require(tokenAuctionEnd[tokenId] > 0, "Auction not started");
+        require(block.timestamp >= tokenAuctionEnd[tokenId], "Auction not ended yet");
+
+        address highestBidder = approvedAuctionBidder[tokenId];
+        require(highestBidder != address(0), "No approved bidder");
+
+        // Transfer the highest bid to the highest bidder
+        (bool success, ) = highestBidder.call{value: highestBid[tokenId]}("");
+        require(success, "Transfer failed");
+
+        // Reset auction data
+        tokenAuctionEnd[tokenId] = 0;
+        highestBid[tokenId] = 0;
+        approvedAuctionBidder[tokenId] = address(0);
+    }
+
+    function emergencyTokenTransfer(address to, uint256 tokenId) external onlyOwner {
+        _transfer(owner(), to, tokenId);
+    }
+
 
     function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal virtual override {}
 
@@ -88,6 +121,15 @@ contract ArtMarketplace is ERC721Enumerable, Ownable {
     function _baseURI() internal view virtual override returns (string memory) {
         return "https://put api.example here"; //put api link example here
     }
+
+      modifier whenNotPaused() {
+        require(!paused(), "Contract is paused");
+        _;
+    }
+
+    event ArtAuctionEnded(uint256 indexed tokenId, address winner, uint256 winningBid);
+
+
 
     // Add other helper functions, events, etc.
 }
