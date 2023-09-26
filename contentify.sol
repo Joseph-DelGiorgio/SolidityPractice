@@ -9,6 +9,8 @@ contract Contentify is Ownable {
         address creator;
         string contentHash;
         uint256 price; // in platform's native token
+        uint256 totalPurchases;
+        uint256 purchaseLimit;
     }
 
     mapping(uint256 => Content) public contents;
@@ -16,40 +18,45 @@ contract Contentify is Ownable {
 
     IERC20 public platformToken;
 
-    event ContentUploaded(uint256 indexed contentId, address indexed creator, string contentHash, uint256 price);
+    event ContentUploaded(uint256 indexed contentId, address indexed creator, string contentHash, uint256 price, uint256 purchaseLimit);
+    event ContentPurchased(uint256 indexed contentId, address indexed buyer);
 
     constructor(address _platformTokenAddress) {
         platformToken = IERC20(_platformTokenAddress);
     }
 
-    function uploadContent(string memory _contentHash, uint256 _price) external {
+    function uploadContent(string memory _contentHash, uint256 _price, uint256 _purchaseLimit) external {
         require(_price > 0, "Price must be greater than 0");
 
         uint256 newContentId = contentCount;
         contents[newContentId] = Content({
             creator: msg.sender,
             contentHash: _contentHash,
-            price: _price
+            price: _price,
+            totalPurchases: 0,
+            purchaseLimit: _purchaseLimit
         });
 
         contentCount++;
 
-        emit ContentUploaded(newContentId, msg.sender, _contentHash, _price);
+        emit ContentUploaded(newContentId, msg.sender, _contentHash, _price, _purchaseLimit);
     }
 
     function purchaseContent(uint256 _contentId) external {
         Content storage content = contents[_contentId];
         require(content.creator != address(0), "Content not found");
+        require(content.totalPurchases < content.purchaseLimit || content.purchaseLimit == 0, "Purchase limit reached");
         require(platformToken.balanceOf(msg.sender) >= content.price, "Insufficient balance");
 
         platformToken.transferFrom(msg.sender, content.creator, content.price);
 
-        // Platform takes a small fee (10% in this example)
-        uint256 platformFee = (content.price * 10) / 100;
-        platformToken.transfer(owner(), platformFee);
+        content.totalPurchases++;
 
-        // Remaining amount goes to the content creator
-        uint256 creatorAmount = content.price - platformFee;
-        platformToken.transfer(content.creator, creatorAmount);
+        emit ContentPurchased(_contentId, msg.sender);
+    }
+
+    function getContentDetails(uint256 _contentId) external view returns (address, string memory, uint256, uint256, uint256) {
+        Content storage content = contents[_contentId];
+        return (content.creator, content.contentHash, content.price, content.totalPurchases, content.purchaseLimit);
     }
 }
