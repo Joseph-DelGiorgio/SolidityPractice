@@ -11,18 +11,21 @@ contract MultisigVault {
     uint public transactionCount;
     mapping(uint => Transaction) public transactions;
 
+    // Donation-related events
+    event DonationReceived(address indexed donor, uint256 amount);
+    event FundsWithdrawn(address indexed beneficiary, uint256 amount);
+    event TransactionCreated(address indexed creator, uint indexed transactionId, address to, uint value, bytes data);
+    event TransactionExecuted(address indexed executor, uint indexed transactionId);
+    event OwnerAdded(address indexed owner);
+    event OwnerRemoved(address indexed owner);
+    event RequiredSignaturesChanged(uint indexed requiredSignatures);
+
     struct Transaction {
         address to;
         uint value;
         bytes data;
         bool executed;
     }
-
-    event TransactionCreated(address indexed creator, uint indexed transactionId, address to, uint value, bytes data);
-    event TransactionExecuted(address indexed executor, uint indexed transactionId);
-    event OwnerAdded(address indexed owner);
-    event OwnerRemoved(address indexed owner);
-    event RequiredSignaturesChanged(uint indexed requiredSignatures);
 
     modifier onlyOwner() {
         require(isOwner(msg.sender), "Not an owner");
@@ -149,5 +152,31 @@ contract MultisigVault {
 
     receive() external payable {
         // Allow the contract to receive Ether
+    }
+
+    // Function to allow direct ERC-20 token donations
+    function donateTokens(address tokenAddress, uint256 amount) public {
+        require(amount > 0, "Donation amount must be greater than 0");
+        require(isOwner(msg.sender), "Not an owner");
+        require(ERC20(tokenAddress).transfer(address(this), amount), "Token transfer failed");
+
+        emit DonationReceived(msg.sender, amount);
+    }
+
+    // Function to allow direct Ether donations
+    function donateEther() public payable {
+        require(msg.value > 0, "Donation amount must be greater than 0");
+
+        emit DonationReceived(msg.sender, msg.value);
+    }
+
+    // Function to allow withdrawing funds (only for owners)
+    function withdrawFunds(address payable beneficiary, uint256 amount) public onlyOwner {
+        require(beneficiary != address(0), "Invalid beneficiary address");
+        require(amount > 0, "Withdrawal amount must be greater than 0");
+        require(address(this).balance >= amount, "Insufficient contract balance");
+
+        beneficiary.transfer(amount);
+        emit FundsWithdrawn(beneficiary, amount);
     }
 }
