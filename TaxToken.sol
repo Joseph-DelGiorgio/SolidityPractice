@@ -1,29 +1,28 @@
-pragma solidity ^0.7.0;
+pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract TaxToken is ERC20 {
+contract TaxToken is ERC20, Ownable {
+    uint public taxRate;
 
-    //10% tax
-    uint public taxDivisor = 10;
+    event TaxRateChanged(uint oldRate, uint newRate);
 
-    constructor() ERC20("TaxToken", "TT") {}
-
-    function mintToMe(uint amount) public {
-        //msg.sender is a global var in EVM
-        _mint(msg.sender, amount);
+    constructor(uint _taxRate) ERC20("TaxToken", "TT") {
+        require(_taxRate <= 100, "Tax rate should be between 0 and 100");
+        taxRate = _taxRate;
     }
 
-    function transfer(address to, uint amount) public override returns (bool) {
-        uint balanceSender = balanceOf(msg.sender);
-        require(balanceSender >= amount, "ERC20: Not enough balance for a transfer");
+    function setTaxRate(uint _taxRate) external onlyOwner {
+        require(_taxRate <= 100, "Tax rate should be between 0 and 100");
+        emit TaxRateChanged(taxRate, _taxRate);
+        taxRate = _taxRate;
+    }
 
-        uint taxAmount = amount / taxDivisor;
+    function _transfer(address sender, address recipient, uint256 amount) internal override {
+        uint taxAmount = amount * taxRate / 100;
         uint transferAmount = amount - taxAmount;
-
-        _transfer(msg.sender, to, transferAmount);
-        _transfer(msg.sender, address(0), taxAmount);
-
-        return true;
+        super._transfer(sender, recipient, transferAmount);
+        super._transfer(sender, address(0), taxAmount);
     }
 }
