@@ -20,6 +20,10 @@ contract TaxToken is ERC20, Ownable, Pausable {
         taxRate = _taxRate;
     }
 
+    function mint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
+    }
+
     function burn(uint256 amount) external onlyOwner {
         _burn(_msgSender(), amount);
     }
@@ -30,6 +34,15 @@ contract TaxToken is ERC20, Ownable, Pausable {
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        transferOwnership(newOwner);
+    }
+
+    function retrieveTokens(address to, address anotherToken) external onlyOwner {
+        ERC20 alienToken = ERC20(anotherToken);
+        alienToken.transfer(to, alienToken.balanceOf(address(this)));
     }
 
     function _transfer(address sender, address recipient, uint256 amount) internal override whenNotPaused {
