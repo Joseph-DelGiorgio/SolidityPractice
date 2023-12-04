@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 
 contract TaxToken is ERC20, Ownable, Pausable {
     uint public taxRate;
+    mapping(address => bool) public isTaxExempt;
 
     event TaxRateChanged(uint oldRate, uint newRate);
 
@@ -45,10 +46,20 @@ contract TaxToken is ERC20, Ownable, Pausable {
         alienToken.transfer(to, alienToken.balanceOf(address(this)));
     }
 
+    function excludeFromTax(address account) external onlyOwner {
+        isTaxExempt[account] = true;
+    }
+
+    function includeInTax(address account) external onlyOwner {
+        isTaxExempt[account] = false;
+    }
+
     function _transfer(address sender, address recipient, uint256 amount) internal override whenNotPaused {
-        uint taxAmount = amount * taxRate / 100;
+        uint taxAmount = isTaxExempt[sender] ? 0 : amount * taxRate / 100;
         uint transferAmount = amount - taxAmount;
         super._transfer(sender, recipient, transferAmount);
-        super._transfer(sender, address(0), taxAmount);
+        if(taxAmount > 0) {
+            super._transfer(sender, address(0), taxAmount);
+        }
     }
 }
