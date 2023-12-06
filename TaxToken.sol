@@ -46,12 +46,16 @@ contract TaxToken is ERC20, Ownable, Pausable {
         alienToken.transfer(to, alienToken.balanceOf(address(this)));
     }
 
-    function excludeFromTax(address account) external onlyOwner {
-        isTaxExempt[account] = true;
+    function setTaxExemptionForMultipleAddresses(address[] calldata accounts, bool status) external onlyOwner {
+        for (uint256 i = 0; i < accounts.length; i++) {
+            isTaxExempt[accounts[i]] = status;
+        }
     }
 
-    function includeInTax(address account) external onlyOwner {
-        isTaxExempt[account] = false;
+    function transferAnyRemainingETHBalance(address payable recipient) external onlyOwner {
+        require(address(this).balance > 0, "No ETH balance to transfer");
+        (bool success, ) = recipient.call{value: address(this).balance}("");
+        require(success, "Transfer failed");
     }
 
     function _transfer(address sender, address recipient, uint256 amount) internal override whenNotPaused {
