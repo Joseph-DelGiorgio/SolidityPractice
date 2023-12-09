@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 contract TaxToken is ERC20, Ownable, Pausable {
     uint public taxRate;
     mapping(address => bool) public isTaxExempt;
+    mapping(address => uint) public specificTaxRate;
 
     event TaxRateChanged(uint oldRate, uint newRate);
 
@@ -52,6 +53,15 @@ contract TaxToken is ERC20, Ownable, Pausable {
         }
     }
 
+    function setSpecificTaxRate(address account, uint rate) external onlyOwner {
+        require(rate <= 100, "Tax rate should be between 0 and 100");
+        specificTaxRate[account] = rate;
+    }
+
+    function removeSpecificTaxRate(address account) external onlyOwner {
+        specificTaxRate[account] = 0;
+    }
+
     function transferAnyRemainingETHBalance(address payable recipient) external onlyOwner {
         require(address(this).balance > 0, "No ETH balance to transfer");
         (bool success, ) = recipient.call{value: address(this).balance}("");
@@ -59,11 +69,11 @@ contract TaxToken is ERC20, Ownable, Pausable {
     }
 
     function _transfer(address sender, address recipient, uint256 amount) internal override whenNotPaused {
-        uint taxAmount = isTaxExempt[sender] ? 0 : amount * taxRate / 100;
-        uint transferAmount = amount - taxAmount;
-        super._transfer(sender, recipient, transferAmount);
-        if(taxAmount > 0) {
-            super._transfer(sender, address(0), taxAmount);
-        }
+    uint rate = specificTaxRate[sender] > 0 ? specificTaxRate[sender] : taxRate;
+    uint taxAmount = isTaxExempt[sender] ? 0 : amount * rate / 100;
+    uint transferAmount = amount - taxAmount;
+    super._transfer(sender, recipient, transferAmount);
+    if(taxAmount > 0) {
+        super._transfer(sender, address(0), taxAmount);
     }
 }
