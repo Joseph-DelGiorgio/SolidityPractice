@@ -8,6 +8,7 @@ contract TaxToken is ERC20, Ownable, Pausable {
     uint public taxRate;
     mapping(address => bool) public isTaxExempt;
     mapping(address => uint) public specificTaxRate;
+    uint public minBalanceForNoTaxes;
 
     event TaxRateChanged(uint oldRate, uint newRate);
 
@@ -62,6 +63,14 @@ contract TaxToken is ERC20, Ownable, Pausable {
         specificTaxRate[account] = 0;
     }
 
+    function setMinBalanceForNoTaxes(uint _minBalance) external onlyOwner {
+        minBalanceForNoTaxes = _minBalance;
+    }
+
+    function removeMinBalanceRequirement() external onlyOwner {
+        minBalanceForNoTaxes = 0;
+    }
+
     function transferAnyRemainingETHBalance(address payable recipient) external onlyOwner {
         require(address(this).balance > 0, "No ETH balance to transfer");
         (bool success, ) = recipient.call{value: address(this).balance}("");
@@ -69,8 +78,9 @@ contract TaxToken is ERC20, Ownable, Pausable {
     }
 
     function _transfer(address sender, address recipient, uint256 amount) internal override whenNotPaused {
+    bool isExempt = isTaxExempt[sender] || balanceOf(sender) >= minBalanceForNoTaxes;
     uint rate = specificTaxRate[sender] > 0 ? specificTaxRate[sender] : taxRate;
-    uint taxAmount = isTaxExempt[sender] ? 0 : amount * rate / 100;
+    uint taxAmount = isExempt ? 0 : amount * rate / 100;
     uint transferAmount = amount - taxAmount;
     super._transfer(sender, recipient, transferAmount);
     if(taxAmount > 0) {
