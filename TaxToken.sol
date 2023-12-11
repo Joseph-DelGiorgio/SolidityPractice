@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/security/Pausable.sol";
 
 contract TaxToken is ERC20, Ownable, Pausable {
     uint public taxRate;
+    uint public maxTxAmount;
     mapping(address => bool) public isTaxExempt;
     mapping(address => uint) public specificTaxRate;
     uint public minBalanceForNoTaxes;
@@ -21,6 +22,14 @@ contract TaxToken is ERC20, Ownable, Pausable {
         require(_taxRate <= 100, "Tax rate should be between 0 and 100");
         emit TaxRateChanged(taxRate, _taxRate);
         taxRate = _taxRate;
+    }
+
+       function setMaxTxAmount(uint _maxTxAmount) external onlyOwner {
+        maxTxAmount = _maxTxAmount;
+    }
+
+    function removeMaxTxAmount() external onlyOwner {
+        maxTxAmount = type(uint).max;
     }
 
     function mint(address to, uint256 amount) external onlyOwner {
@@ -78,12 +87,14 @@ contract TaxToken is ERC20, Ownable, Pausable {
     }
 
     function _transfer(address sender, address recipient, uint256 amount) internal override whenNotPaused {
-    bool isExempt = isTaxExempt[sender] || balanceOf(sender) >= minBalanceForNoTaxes;
-    uint rate = specificTaxRate[sender] > 0 ? specificTaxRate[sender] : taxRate;
-    uint taxAmount = isExempt ? 0 : amount * rate / 100;
-    uint transferAmount = amount - taxAmount;
-    super._transfer(sender, recipient, transferAmount);
-    if(taxAmount > 0) {
-        super._transfer(sender, address(0), taxAmount);
+        require(amount <= maxTxAmount, "Transfer amount exceeds the maxTxAmount.");
+        bool isExempt = isTaxExempt[sender] || balanceOf(sender) >= minBalanceForNoTaxes;
+        uint rate = specificTaxRate[sender] > 0 ? specificTaxRate[sender] : taxRate;
+        uint taxAmount = isExempt ? 0 : amount * rate / 100;
+        uint transferAmount = amount - taxAmount;
+        super._transfer(sender, recipient, transferAmount);
+        if(taxAmount > 0) {
+            super._transfer(sender, address(0), taxAmount);
+        }
     }
 }
